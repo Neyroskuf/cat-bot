@@ -1,14 +1,21 @@
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
-import urllib.parse
+import asyncio
 import time
+import urllib.parse
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
-import asyncio
 
-BOT_TOKEN = "7885828113:AAEx4T2WTh3B0ondFCAsOn5vmoXnLPcST-g"
+from telegram import Update
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
 
-# 1. Простой фейковый HTTP-сервер (чтобы Render не выключал бота)
+BOT_TOKEN = "твой_токен_сюда"
+
+# HTTP-сервер для Render, чтобы не выключался сервис
 class DummyHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -19,9 +26,9 @@ def run_dummy_server():
     server = HTTPServer(('0.0.0.0', 10000), DummyHandler)
     server.serve_forever()
 
-# 2. Команды Telegram-бота
+# Команды
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print(f"[start] Получено от {update.effective_user.username}")
+    print(f"[start] @{update.effective_user.username}")
     await update.message.reply_text("Привет! Я котобот 🐱\n/cat — случайный кот\n/cat Привет — кот с подписью")
 
 async def send_cat(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -33,26 +40,24 @@ async def send_cat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             cat_url = f"https://cataas.com/cat?timestamp={timestamp}"
 
-        print(f"[cat] Отправка кота: {cat_url}")
+        print(f"[cat] Отправка: {cat_url}")
         await update.message.reply_photo(cat_url)
 
     except Exception as e:
-        print("❌ Ошибка при отправке кота:", e)
+        print(f"❌ Ошибка: {e}")
         await update.message.reply_text("😿 Не удалось получить котика...")
 
-# 3. Выводим в лог любое сообщение, даже неизвестные команды
 async def log_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message.text
-    print(f"[log] Получено сообщение: {msg}")
+    print(f"[log] {update.message.text}")
 
-# 4. Периодический "пульс", чтобы было видно, что бот работает
+# Пульс
 async def heartbeat():
     while True:
-        print("[pulse] Бот активен", time.strftime("%Y-%m-%d %H:%M:%S"))
+        print(f"[pulse] Бот активен: {time.strftime('%Y-%m-%d %H:%M:%S')}")
         await asyncio.sleep(30)
 
-# 5. Запуск
-if __name__ == "__main__":
+# Асинхронный запуск
+async def main():
     threading.Thread(target=run_dummy_server, daemon=True).start()
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -60,7 +65,8 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("cat", send_cat))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, log_all))
 
-    loop = asyncio.get_event_loop()
-    loop.create_task(heartbeat())
+    asyncio.create_task(heartbeat())
+    await app.run_polling()
 
-    app.run_polling()
+if __name__ == "__main__":
+    asyncio.run(main())
